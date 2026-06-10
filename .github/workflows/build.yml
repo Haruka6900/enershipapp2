@@ -1,1 +1,50 @@
+name: Build EnerShip APK
 
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Generate Gradle Wrapper JAR
+        run: |
+          # Télécharge le vrai gradle-wrapper.jar depuis la distribution officielle
+          GRADLE_VERSION=8.4
+          WRAPPER_JAR_URL="https://raw.githubusercontent.com/gradle/gradle/v${GRADLE_VERSION}.0/gradle/wrapper/gradle-wrapper.jar"
+          # Fallback : regénérer via gradle system
+          if ! curl --fail -L -o gradle/wrapper/gradle-wrapper.jar "$WRAPPER_JAR_URL" 2>/dev/null; then
+            gradle wrapper --gradle-version=${GRADLE_VERSION}
+          fi
+          # Vérification que c'est bien un vrai JAR (magic bytes PK)
+          if ! file gradle/wrapper/gradle-wrapper.jar | grep -q "Zip\|JAR\|Java"; then
+            echo "JAR invalide, regénération via gradle..."
+            gradle wrapper --gradle-version=${GRADLE_VERSION}
+          fi
+
+      - name: Make gradlew executable
+        run: chmod +x ./gradlew
+
+      - name: Build Debug APK
+        run: ./gradlew assembleDebug
+
+      - name: Upload APK (Debug)
+        uses: actions/upload-artifact@v4
+        with:
+          name: EnerShip-debug
+          path: app/build/outputs/apk/debug/app-debug.apk
